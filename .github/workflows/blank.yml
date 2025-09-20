@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LibreVoid Ecosystem</title>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Open Sans', sans-serif;
+      background: linear-gradient(135deg, #1a2e3e, #0f1a2e);
+      color: #d0d8e0;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .container {
+      background: rgba(15, 26, 46, 0.9);
+      padding: 25px;
+      border-radius: 12px;
+      width: 900px;
+      max-width: 90%;
+      box-shadow: 0 0 15px rgba(0, 204, 153, 0.3);
+      display: grid;
+      grid-template-areas:
+        "header header"
+        "main stats"
+        "history leaderboard";
+      grid-template-columns: 2fr 1fr;
+      grid-gap: 20px;
+    }
+    h1 {
+      grid-area: header;
+      font-size: 2.5em;
+      margin-bottom: 20px;
+      color: #00cc99;
+      text-shadow: 0 0 5px rgba(0, 204, 153, 0.5);
+      text-align: center;
+    }
+    #result {
+      grid-area: main;
+      margin-top: 0;
+      padding: 20px;
+      background: #0a1f2e;
+      border-radius: 8px;
+      border-left: 4px solid #00cc99;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #stats {
+      grid-area: stats;
+      margin-top: 0;
+      padding: 20px;
+      background: #0a1f2e;
+      border-radius: 8px;
+      border-left: 4px solid #00cc99;
+    }
+    #history {
+      grid-area: history;
+      margin-top: 0;
+      padding: 20px;
+      background: #0a1f2e;
+      border-radius: 8px;
+      border-left: 4px solid #00cc99;
+      min-height: 200px;
+    }
+    #leaderboard {
+      grid-area: leaderboard;
+      margin-top: 0;
+      padding: 20px;
+      background: #0a1f2e;
+      border-radius: 8px;
+      border-left: 4px solid #00cc99;
+      min-height: 200px;
+    }
+    .button-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    button, input[type="text"], input[type="file"] {
+      background: #00cc99;
+      border: none;
+      padding: 12px 25px;
+      color: #0f1a2e;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 5px;
+      transition: background 0.3s, transform 0.2s;
+      font-size: 0.9em;
+    }
+    button:hover, input[type="text"]:focus, input[type="file"]:focus {
+      background: #00b388;
+      transform: scale(1.05);
+    }
+    input[type="text"], input[type="file"] {
+      width: 100%;
+      max-width: 300px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+      font-size: 0.9em;
+    }
+    .copy-btn {
+      background: #ff66b3;
+      padding: 8px 15px;
+      font-size: 0.8em;
+      margin-left: 10px;
+      border-radius: 6px;
+    }
+    .copy-btn:hover {
+      background: #ff3399;
+    }
+    .badge {
+      color: #ffeb3b;
+      font-weight: bold;
+      margin-top: 5px;
+      text-shadow: 0 0 3px #ffeb3b;
+    }
+    .loader {
+      border: 6px solid #d0d8e0;
+      border-top: 6px solid #00cc99;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 15px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .warning {
+      color: #ff4444;
+      font-size: 0.7em;
+      margin-top: 5px;
+      text-align: center;
+    }
+    .small-text {
+      font-size: 0.7em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>LibreVoid Ecosystem</h1>
+    <div id="result"></div>
+    <div id="stats"></div>
+    <div id="history"></div>
+    <div id="leaderboard"></div>
+  </div>
+  <script>
+    const TOTAL_SUPPLY = 1000000000000; // 1 trillion LVU
+    let ecosystemData = JSON.parse(localStorage.getItem('librevoid_ecosystem')) || { wallets: {}, transactions: 0, rewardPool: 1000000, activeAddress: null };
+
+    const wordList = [
+      "void", "libre", "crypto", "freedom", "shadow", "zero", "trace", "chain", "pulse", "nova",
+      "echo", "rift", "lunar", "forge", "spire", "zenith", "orbit", "flux", "aura", "vortex"
+    ];
+
+    function generatePhrase() {
+      return Array(20).fill().map(() => wordList[Math.floor(Math.random() * wordList.length)]).join(' ');
+    }
+
+    function computeTrustScore(address) {
+      const wallet = ecosystemData.wallets[address];
+      if (!wallet) return 0;
+      const txCount = wallet.history.length;
+      const daysActive = (Date.now() - wallet.created) / (1000 * 60 * 60 * 24);
+      return Math.min(100, Math.floor((txCount * 10) + (daysActive * 0.5)));
+    }
+
+    function updateStats() {
+      const walletCount = Object.keys(ecosystemData.wallets).length;
+      const txCount = ecosystemData.transactions;
+      document.getElementById('stats').innerHTML = `
+        <strong>Stats:</strong><br>
+        Wallets: <span class="small-text">${walletCount.toLocaleString()}</span><br>
+        Transactions: <span class="small-text">${txCount.toLocaleString()}</span><br>
+        Reward Pool: <span class="small-text">${ecosystemData.rewardPool.toLocaleString()} LVU</span><br>
+        Active Trust: <span class="small-text">${computeTrustScore(ecosystemData.activeAddress) || 0}%</span>
+      `;
+    }
+
+    function updateLeaderboard() {
+      const scores = Object.entries(ecosystemData.wallets).map(([addr, data]) => ({ addr, score: computeTrustScore(addr) })).sort((a, b) => b.score - a.score).slice(0, 3);
+      document.getElementById('leaderboard').innerHTML = `
+        <strong>Top Trust Scores:</strong><br>
+        ${scores.map((item, i) => `${i + 1}. ${item.addr}: <span class="small-text">${item.score}%</span>`).join('<br>') || 'No leaders yet'}
+      `;
+    }
+
+    function saveEcosystem() {
+      localStorage.setItem('librevoid_ecosystem', JSON.stringify(ecosystemData));
+    }
+
+    function generateWallet(phrase = null) {
+      const resultDiv = document.getElementById('result');
+      const historyDiv = document.getElementById('history');
+      resultDiv.innerHTML = '<div class="loader"></div>';
+
+      setTimeout(() => {
+        try {
+          const address = Math.random().toString(36).substring(2, 46);
+          const usedPhrase = phrase || generatePhrase();
+          const amount = Math.floor(Math.random() * 1000) + 100;
+          ecosystemData.wallets[address] = { phrase: usedPhrase, amount, history: [`Wallet created with ${amount} LVU`], created: Date.now(), trustScore: 0 };
+          if (!ecosystemData.activeAddress) ecosystemData.activeAddress = address;
+          saveEcosystem();
+          updateStats();
+          updateLeaderboard();
+
+          const trustScore = computeTrustScore(address);
+          const badge = trustScore >= 50 ? '<div class="badge">Freedom Pioneer</div>' : '';
+
+          resultDiv.innerHTML = `
+            <strong>Address:</strong> ${address} <button class="copy-btn" onclick="copyToClipboard('${address}')">Copy</button><br>
+            <strong>Recovery Phrase:</strong> ${usedPhrase} <button class="copy-btn" onclick="copyToClipboard('${usedPhrase}')">Copy</button><br>
+            <strong>Balance:</strong> ${amount} LVU<br>
+            <strong>Trust Score:</strong> ${trustScore}% ${badge}<br>
+            <div class="button-container">
+              <button onclick="showWalletSwitcher()">Switch Wallet</button>
+              <button onclick="showSend('${address}')">Send</button>
+              <button onclick="showReceive('${address}')">Receive</button>
+              <button onclick="claimReward('${address}')">Claim Reward</button>
+              <button onclick="backupWallet()">Backup</button>
+              <button onclick="deactivate()">Deactivate</button>
+            </div>
+          `;
+          historyDiv.innerHTML = '<strong>History:</strong> ' + ecosystemData.wallets[address].history.join('<br>');
+        } catch (error) {
+          resultDiv.innerHTML = `Error: ${error.message}.<br><button onclick="resetView()">Back</button>`;
+          console.error('Wallet Gen Error:', error);
+        }
+      }, 1500);
+    }
+
+    function recoverWallet() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = `
+        <h2>Recover Wallet</h2>
+        <input type="text" id="recover-phrase" placeholder="Enter Recovery Phrase"><br>
+        <div class="button-container">
+          <button onclick="processRecovery()">Recover</button>
+          <button onclick="resetView()">Back</button>
+        </div>
+      `;
+    }
+
+    function processRecovery() {
+      const resultDiv = document.getElementById('result');
+      const phrase = document.getElementById('recover-phrase').value.trim();
+      if (!phrase) {
+        resultDiv.innerHTML = `Error: Please enter a recovery phrase.<br><div class="button-container"><button onclick="resetView()">Back</button></div>`;
+        return;
+      }
+      resultDiv.innerHTML = '<div class="loader"></div>';
+
+      setTimeout(() => {
+        try {
+          let found = false;
+          for (let addr in ecosystemData.wallets) {
+            if (ecosystemData.wallets[addr].phrase === phrase) {
+              ecosystemData.activeAddress = addr;
+              saveEcosystem();
+              resetView(addr);
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            generateWallet(phrase); // Create new wallet with provided phrase
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `Error: ${error.message}.<br><div class="button-container"><button onclick="resetView()">Back</button></div>`;
+          console.error('Recovery Error:', error);
+        }
+      }, 1500);
+    }
+
+    function showWalletSwitcher() {
+      const resultDiv = document.getElementById('result');
+      const options = Object.keys(ecosystemData.wallets).map(addr => `<option value="${addr}">${addr} (Balance: ${ecosystemData.wallets[addr].amount} LVU)</option>`).join('');
+      resultDiv.innerHTML = `
+        <h2>Switch Wallet</h2>
+        <select id="wallet-select">${options}</select><br>
+        <div class="button-container">
+          <button onclick="switchWallet()">Switch</button>
+          <button onclick="resetView()">Back</button>
+        </div>
+      `;
+    }
+
+    function switchWallet() {
+      const resultDiv = document.getElementById('result');
+      const historyDiv = document.getElementById('history');
+      const select = document.getElementById('wallet-select');
+      const address = select.value;
+      ecosystemData.activeAddress = address;
+      saveEcosystem();
+
+      const data = ecosystemData.wallets[address];
+      const trustScore = computeTrustScore(address);
+      const badge = trustScore >= 50 ? '<div class="badge">Freedom Pioneer</div>' : '';
+
+      resultDiv.innerHTML = `
+        <strong>Address:</strong> ${address} <button class="copy-btn" onclick="copyToClipboard('${address}')">Copy</button><br>
+        <strong>Recovery Phrase:</strong> ${data.phrase} <button class="copy-btn" onclick="copyToClipboard('${data.phrase}')">Copy</button><br>
+        <strong>Balance:</strong> ${data.amount} LVU<br>
+        <strong>Trust Score:</strong> ${trustScore}% ${badge}<br>
+        <div class="button-container">
+          <button onclick="showWalletSwitcher()">Switch Wallet</button>
+          <button onclick="showSend('${address}')">Send</button>
+          <button onclick="showReceive('${address}')">Receive</button>
+          <button onclick="claimReward('${address}')">Claim Reward</button>
+          <button onclick="backupWallet()">Backup</button>
+          <button onclick="deactivate()">Deactivate</button>
+        </div>
+      `;
+      historyDiv.innerHTML = '<strong>History:</strong> ' + data.history.join('<br>');
+      updateStats();
+      updateLeaderboard();
+    }
+
+    function showSend(address) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = `
+        <h2>Send LVU</h2>
+        <input type="text" id="send-address" placeholder="Enter Receiver Address"><br>
+        <input type="number" id="send-amount" placeholder="Amount to Send" min="1"><br>
+        <div class="button-container">
+          <button onclick="sendLVU('${address}')">Send</button>
+          <button onclick="resetView('${address}')">Back</button>
+        </div>
+        <div class="warning">(New addresses will be created with 0 LVU)</div>
+      `;
+    }
+
+    function sendLVU(fromAddress) {
+      const resultDiv = document.getElementById('result');
+      const historyDiv = document.getElementById('history');
+      const sendAddress = document.getElementById('send-address').value.trim();
+      const sendAmount = parseInt(document.getElementById('send-amount').value);
+      if (!sendAddress || isNaN(sendAmount) || sendAmount <= 0) {
+        resultDiv.innerHTML = `Error: Invalid address or amount.<br><div class="button-container"><button onclick="resetView('${fromAddress}')">Back</button></div>`;
+        return;
+      }
+      if (confirm(`Confirm sending ${sendAmount} LVU to ${sendAddress}?`)) {
+        resultDiv.innerHTML = '<div class="loader"></div>';
+      } else {
+        resetView(fromAddress);
+        return;
+      }
+
+      setTimeout(() => {
+        try {
+          const fromData = ecosystemData.wallets[fromAddress];
+          if (!fromData) throw new Error('Sender wallet not found');
+          if (fromData.amount < sendAmount) throw new Error('Insufficient funds');
+
+          let toData = ecosystemData.wallets[sendAddress];
+          if (!toData) {
+            toData = { phrase: generatePhrase(), amount: 0, history: [], created: Date.now(), trustScore: 0 };
+            ecosystemData.wallets[sendAddress] = toData;
+          }
+          fromData.amount -= sendAmount;
+          toData.amount += sendAmount; // Fixed: Ensure receiver balance updates
+          const timestamp = new Date().toLocaleString();
+          fromData.history.push(`Sent ${sendAmount} LVU to ${sendAddress} at ${timestamp}`);
+          toData.history.push(`Received ${sendAmount} LVU from ${fromAddress} at ${timestamp}`);
+          ecosystemData.transactions++;
+          fromData.trustScore = computeTrustScore(fromAddress);
+          toData.trustScore = computeTrustScore(sendAddress);
+
+          saveEcosystem();
+          updateStats();
+          updateLeaderboard();
+
+          resultDiv.innerHTML = `
+            <h2>Send Complete</h2>
+            <strong>Sent to:</strong> ${sendAddress}<br>
+            <strong>Amount Sent:</strong> ${sendAmount} LVU<br>
+            <strong>New Sender Balance:</strong> ${fromData.amount} LVU<br>
+            <div class="button-container">
+              <button onclick="resetView('${fromAddress}')">Back</button>
+            </div>
+          `;
+          historyDiv.innerHTML = '<strong>History:</strong> ' + fromData.history.join('<br>');
+        } catch (error) {
+          resultDiv.innerHTML = `Error: ${error.message}.<br><div class="button-container"><button onclick="resetView('${fromAddress}')">Back</button></div>`;
+          console.error('Send Error:', error);
+        }
+      }, 1500);
+    }
+
+    function showReceive(address) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = `
+        <h2>Receive LVU</h2>
+        <input type="text" id="receive-address" placeholder="Enter Sender Address"><br>
+        <input type="number" id="receive-amount" placeholder="Amount to Receive" min="1"><br>
+        <div class="button-container">
+          <button onclick="receiveLVU('${address}')">Receive</button>
+          <button onclick="resetView('${address}')">Back</button>
+        </div>
+        <div class="warning">(New addresses will be created with 0 LVU)</div>
+      `;
+    }
+
+    function receiveLVU(toAddress) {
+      const resultDiv = document.getElementById('result');
+      const historyDiv = document.getElementById('history');
+      const receiveAddress = document.getElementById('receive-address').value.trim();
+      const receiveAmount = parseInt(document.getElementById('receive-amount').value);
+      if (!receiveAddress || isNaN(receiveAmount) || receiveAmount <= 0) {
+        resultDiv.innerHTML = `Error: Invalid address or amount.<br><div class="button-container"><button onclick="resetView('${toAddress}')">Back</button></div>`;
+        return;
+      }
+      if (confirm(`Confirm receiving ${receiveAmount} LVU from ${receiveAddress}?`)) {
+        resultDiv.innerHTML = '<div class="loader"></div>';
+      } else {
+        resetView(toAddress);
+        return;
+      }
+
+      setTimeout(() => {
+        try {
+          const toData = ecosystemData.wallets[toAddress];
+          if (!toData) throw new Error('Recipient wallet not found');
+
+          let fromData = ecosystemData.wallets[receiveAddress];
+          if (!fromData) {
+            fromData = { phrase: generatePhrase(), amount: 0, history: [], created: Date.now(), trustScore: 0 };
+            ecosystemData.wallets[receiveAddress] = fromData;
+          }
+          if (fromData.amount < receiveAmount) throw new Error('Sender has insufficient funds');
+          fromData.amount -= receiveAmount;
+          toData.amount += receiveAmount;
+          const timestamp = new Date().toLocaleString();
+          toData.history.push(`Received ${receiveAmount} LVU from ${receiveAddress} at ${timestamp}`);
+          fromData.history.push(`Sent ${receiveAmount} LVU to ${toAddress} at ${timestamp}`);
+          ecosystemData.transactions++;
+          toData.trustScore = computeTrustScore(toAddress);
+          fromData.trustScore = computeTrustScore(receiveAddress);
+
+          saveEcosystem();
+          updateStats();
+          updateLeaderboard();
+
+          resultDiv.innerHTML = `
+            <h2>Receive Complete</h2>
+            <strong>From:</strong> ${receiveAddress}<br>
+            <strong>Amount Received:</strong> ${receiveAmount} LVU<br>
+            <strong>New Balance:</strong> ${toData.amount} LVU<br>
+            <div class="button-container">
+              <button onclick="resetView('${toAddress}')">Back</button>
+            </div>
+          `;
+          historyDiv.innerHTML = '<strong>History:</strong> ' + toData.history.join('<br>');
+        } catch (error) {
+          resultDiv.innerHTML = `Error: ${error.message}.<br><div class="button-container"><button onclick="resetView('${toAddress}')">Back</button></div>`;
+          console.error('Receive Error:', error);
+        }
+      }, 1500);
+    }
+
+    function claimReward(address) {
+      const resultDiv = document.getElementById('result');
+      const historyDiv = document.getElementById('history');
+      resultDiv.innerHTML = '<div class="loader"></div>';
+
+      setTimeout(() => {
+        try {
+          const wallet = ecosystemData.wallets[address];
+          if (!wallet || wallet.trustScore < 50) throw new Error('Trust score too low to claim (need 50%+).');
+          if (ecosystemData.rewardPool <= 0) throw new Error('No rewards available.');
+
+          const reward = Math.min(1000 + (wallet.trustScore - 50) * 10, ecosystemData.rewardPool);
+          wallet.amount += reward;
+          ecosystemData.rewardPool -= reward;
+          wallet.history.push(`Claimed ${reward} LVU reward at ${new Date().toLocaleString()}`);
+          wallet.trustScore = computeTrustScore(address);
+
+          saveEcosystem();
+          updateStats();
+          updateLeaderboard();
+
+          resultDiv.innerHTML = `
+            <h2>Reward Claimed</h2>
+            <strong>Amount:</strong> ${reward} LVU<br>
+            <strong>New Balance:</strong> ${wallet.amount} LVU<br>
+            <div class="button-container">
+              <button onclick="resetView('${address}')">Back</button>
+            </div>
+          `;
+          historyDiv.innerHTML = '<strong>History:</strong> ' + wallet.history.join('<br>');
+        } catch (error) {
+          resultDiv.innerHTML = `Error: ${error.message}.<br><div class="button-container"><button onclick="resetView('${address}')">Back</button></div>`;
+          console.error('Reward Error:', error);
+        }
+      }, 1500);
+    }
+
+    function backupWallet() {
+      const blob = new Blob([JSON.stringify(ecosystemData)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'librevoid-ecosystem-backup.json';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function restoreWallet() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = `
+        <h2>Restore Ecosystem</h2>
+        <input type="file" id="restore-file" accept=".json"><br>
+        <div class="button-container">
+          <button onclick="processRestore()">Restore</button>
+          <button onclick="resetView()">Back</button>
+        </div>
+      `;
+    }
+
+    function processRestore() {
+      const resultDiv = document.getElementById('result');
+      const fileInput = document.getElementById('restore-file');
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            ecosystemData = JSON.parse(e.target.result);
+            saveEcosystem();
+            updateStats();
+            updateLeaderboard();
+            if (ecosystemData.activeAddress) {
+              resetView(ecosystemData.activeAddress);
+            } else {
+              resetView();
+            }
+          } catch (error) {
+            resultDiv.innerHTML = `Error: Invalid backup file. ${error.message}<br><div class="button-container"><button onclick="resetView()">Back</button></div>`;
+            console.error('Restore Error:', error);
+          }
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    function deactivate() {
+      ecosystemData = { wallets: {}, transactions: 0, rewardPool: 1000000, activeAddress: null };
+      saveEcosystem();
+      document.getElementById('result').innerHTML = "Ecosystem deactivated. All traces wiped.";
+      document.getElementById('stats').innerHTML = '';
+      document.getElementById('history').innerHTML = '';
+      document.getElementById('leaderboard').innerHTML = '';
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      }).catch(err => console.error('Copy Error:', err));
+    }
+
+    function resetView(address) {
+      if (Object.keys(ecosystemData.wallets).length > 0) {
+        const options = ecosystemData.activeAddress ? [`<option value="${ecosystemData.activeAddress}">${ecosystemData.activeAddress} (Active)</option>`] : [];
+        options.push(...Object.keys(ecosystemData.wallets).filter(a => a !== ecosystemData.activeAddress).map(addr => `<option value="${addr}">${addr} (Balance: ${ecosystemData.wallets[addr].amount} LVU)</option>`));
+        document.getElementById('result').innerHTML = `
+          <h2>Welcome to LibreVoid</h2>
+          <select id="wallet-select" onchange="switchWallet()">${options.join('')}</select><br>
+          <div class="button-container">
+            <button onclick="recoverWallet()">Recover Wallet</button>
+            <button onclick="generateWallet()">Generate Wallet</button>
+            <button onclick="restoreWallet()">Restore Ecosystem</button>
+            <button onclick="deactivate()">Deactivate</button>
+          </div>
+        `;
+        if (ecosystemData.activeAddress) switchWallet();
+      } else {
+        document.getElementById('result').innerHTML = `
+          <h2>Welcome to LibreVoid</h2>
+          <div class="button-container">
+            <button onclick="recoverWallet()">Recover Wallet</button>
+            <button onclick="generateWallet()">Generate Wallet</button>
+            <button onclick="restoreWallet()">Restore Ecosystem</button>
+          </div>
+        `;
+      }
+      updateStats();
+      updateLeaderboard();
+    }
+
+    window.onload = () => {
+      resetView();
+    };
+  </script>
+</body>
+</html>
